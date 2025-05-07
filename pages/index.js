@@ -7,24 +7,34 @@ export default function Home() {
 
   useEffect(() => {
     async function loadModel() {
-      try {
-        const loadedModel = await tf.loadLayersModel('/tfjs_model/model.json');
-        
-        // Workaround untuk model tanpa input shape
-        if (!loadedModel.inputs[0].shape) {
-          const input = tf.input({ shape: [224, 224, 3] });
-          const newModel = tf.model({ 
-            inputs: input, 
-            outputs: loadedModel.apply(input) 
-          });
-          setModel(newModel);
-        } else {
-          setModel(loadedModel);
+        try {
+          // Opsi 1: Coba muat sebagai Layers Model
+          let model = await tf.loadLayersModel('/tfjs_model/model.json');
+          
+          // Jika masih error, buat wrapper dengan input shape manual
+          if (!model.inputs[0].shape) {
+            console.warn('Model has no input shape, applying manual fix...');
+            const input = tf.input({shape: [224, 224, 3]});
+            model = tf.model({
+              inputs: input,
+              outputs: model.apply(input)
+            });
+          }
+          
+          return model;
+        } catch (error) {
+          console.error('Layers model failed:', error);
+          
+          // Opsi 2: Coba muat sebagai Graph Model
+          try {
+            const model = await tf.loadGraphModel('/tfjs_model/model.json');
+            console.log('Loaded as GraphModel');
+            return model;
+          } catch (graphError) {
+            throw new Error(`Both formats failed: ${graphError}`);
+          }
         }
-      } catch (error) {
-        console.error("Failed to load model:", error);
       }
-    }
     loadModel();
   }, []);
 
